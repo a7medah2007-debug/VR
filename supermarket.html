@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+
+    <style>
+      #get-pos { position: absolute; top: 20px; right: 20px; padding: 12px; background: #A52A2A; color: white; border: none; border-radius: 8px; z-index: 1000; font-weight: bold; cursor: pointer; }
+      .controls { position: absolute; bottom: 20px; left: 20px; display: grid; grid-template-columns: repeat(3, 50px); gap: 10px; z-index: 1000; }
+      .btn { width: 50px; height: 50px; background: rgba(165, 42, 42, 0.8); color: white; border: none; border-radius: 10px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; user-select: none; cursor: pointer; }
+      .up-down-controls { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
+      #throw-btn { position: absolute; bottom: 20px; left: 120px; padding: 12px; background: #A52A2A; color: white; border: none; border-radius: 8px; z-index: 1000; font-weight: bold; cursor: pointer; }
+      
+      .action-buttons {
+        position: absolute;
+        bottom: 100px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 1000;
+      }
+      .action-btn {
+        padding: 12px 20px;
+        background: #2E7D32;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .action-btn:active { background: #1B5E20; }
+      #pay-btn { background: #FF9800; }
+      #pay-btn:active { background: #F57C00; }
+      
+      .info-panel {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        font-family: monospace;
+        z-index: 1000;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    
+    <div class="info-panel" id="info-panel">
+      🛒 السلة: 0 منتج | 💰 الإجمالي: 0 جنيه
+    </div>
+    
+    <button id="get-pos">سجل الإحداثيات</button>
+    <button id="throw-btn">🗑️ رمي المنتج</button>
+
+    <div class="action-buttons">
+      <button class="action-btn" id="grab-cart-btn">🛒 مسك العربة</button>
+      <button class="action-btn" id="drop-cart-btn">📍 ترك العربة</button>
+      <button class="action-btn" id="add-to-cart-btn">📦 حط في السلة</button>
+      <button class="action-btn" id="pay-btn">💰 ادفع للكاشير</button>
+    </div>
+
+    <div class="controls">
+      <div></div><button class="btn" id="move-forward">↑</button><div></div>
+      <div></div><button class="btn" id="move-backward">↓</button><div></div>
+    </div>
+
+    <div class="up-down-controls">
+      <button class="btn" id="move-up">▲</button>
+      <button class="btn" id="move-down">▼</button>
+    </div>
+
+    <a-scene webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking; referenceSpaceType: local-floor" spawner background="color: #5D4037" renderer="colorManagement: true; exposure: 0.6;" physics="debug: false; gravity: -9.8">
+      
+      <a-assets>
+        <a-asset-item id="mall" src="assets/models/mall.glb"></a-asset-item>
+        <a-asset-item id="chips-model" src="assets/models/chips4.glb"></a-asset-item>
+        <a-asset-item id="chips2-model" src="assets/models/chips2.glb"></a-asset-item>
+        <a-asset-item id="chips3-model" src="assets/models/chips3.glb"></a-asset-item>
+        <a-asset-item id="cart-model" src="assets/models/cart.glb"></a-asset-item>
+        <a-asset-item id="coca-fridge" src="assets/models/fridge.glb"></a-asset-item>
+        <a-asset-item id="pepsi-model" src="assets/models/can3.glb"></a-asset-item>
+        <a-asset-item id="human-model" src="assets/models/human.glb"></a-asset-item>
+        <a-asset-item id="stop-model" src="assets/models/stop.glb"></a-asset-item>
+        <a-asset-item id="post-model" src="assets/models/post.glb"></a-asset-item>
+      </a-assets>
+
+      <a-entity gltf-model="#mall" static-body="shape: mesh"></a-entity>
+
+      <a-entity id="chips-shelf"></a-entity>
+
+      <a-light type="ambient" intensity="0.4"></a-light>
+      <a-light type="point" position="0 3 0" intensity="0.4"></a-light>
+
+      <!-- أرضية مخفية للكوليجن -->
+      <a-plane id="ground" position="0 -0.1 0" rotation="-90 0 0" width="200" height="200" color="#5D4037" visible="false" static-body="shape: box"></a-plane>
+
+      <a-entity id="rig" position="-18.69 0 -11.10" kinematic-body>
+        <a-camera id="myCam" position="0 1.6 0" look-controls="pointerLockEnabled: false">
+            <a-cursor color="yellow"></a-cursor>
+        </a-camera>
+        <a-entity id="left-hand" hand-tracking-controls="hand: left"></a-entity>
+        <a-entity id="right-hand" hand-tracking-controls="hand: right"></a-entity>
+      </a-entity>
+
+      <!-- العربة 1 -->
+      <a-entity 
+        gltf-model="#cart-model" 
+        id="cart1"
+        position="3.97 .2 46.19" 
+        rotation="0 0 0" 
+        scale="4 4 4" 
+        static-body="shape: box">
+      </a-entity>
+
+      <!-- العربة 2 -->
+      <a-entity 
+        gltf-model="#cart-model" 
+        id="cart2"
+        position="13.15 .2 42.12" 
+        rotation="0 0 0" 
+        scale="4 4 4" 
+        static-body="shape: box">
+      </a-entity>
+
+      <!-- الكاشير -->
+      <a-entity 
+        gltf-model="#human-model" 
+        id="cashier"
+        position="-11.64 3.00 35.01" 
+        rotation="0 0 0" 
+        scale="2 2 2" 
+        static-body="shape: box"
+        look-at-player>
+      </a-entity>
+      
+      <a-entity 
+        gltf-model="#post-model" 
+        position="-23.20 0 114.34" 
+        rotation="0 0 0" 
+        scale="200 300 300" 
+        static-body="shape: box">
+        <a-text 
+          value="STORAGE" 
+          color="black" 
+          align="center" 
+          font="mozillavr"
+          width="0.8"
+          position="0 0.55 0.02" 
+          scale="0.005 0.003 0.003">
+        </a-text>
+      </a-entity>
+
+      <a-entity 
+        gltf-model="#stop-model" 
+        position="-17.57 0 114.34" 
+        rotation="0 0 0" 
+        scale="6 6 6" 
+        static-body="shape: box">
+      </a-entity>
+      
+      <a-entity 
+        gltf-model="#post-model" 
+        position="20.88 0 -2.44" 
+        rotation="0 90 0" 
+        scale="200 300 300" 
+        static-body="shape: box">
+      </a-entity>
+      
+      <a-entity 
+        gltf-model="#stop-model" 
+        position="20.89 0 1.07" 
+        rotation="0 90 0" 
+        scale="6 6 6" 
+        static-body="shape: box">
+      </a-entity>
+      
+      <a-entity position="-1.25 3.75 58.75" rotation="0 0 0">
+        <a-plane width="1.5" height="0.5" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="15 EGP" color="white" align="center" width="6" position="0 0 -0.1" rotation="0 180 0"></a-text>
+      </a-entity>
+
+      <a-entity position="7 3.75 58.75" rotation="0 0 0">
+        <a-plane width="1.5" height="0.5" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="15 EGP" color="white" align="center" width="6" position="0 0 -0.1" rotation="0 180 0"></a-text>
+      </a-entity>
+
+      <a-entity position="18.05 3.75 55" rotation="0 -90 0">
+        <a-plane width="1.5" height="0.5" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="10 EGP" color="white" align="center" width="6" position="0 0 0"></a-text>
+      </a-entity>
+
+      <a-entity position="18.05 3.75 46" rotation="0 -90 0">
+        <a-plane width="1.5" height="0.5" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="10 EGP" color="white" align="center" width="6" position="0 0 0"></a-text>
+      </a-entity>
+
+      <a-entity position="-10.82 6.40 72.3" rotation="0 -90 0">
+        <a-plane width="3" height="1" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="25 EGP" color="white" align="center" width="10" position="0 0 0"></a-text>
+      </a-entity>
+
+      <a-entity position="-33.19 7.0 135" rotation="0 90 0">
+        <a-plane width="3" height="1" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="25 EGP" color="white" align="center" width="10" position="0 0 0"></a-text>
+      </a-entity>
+
+      <a-entity position="-12.21 7.0 135" rotation="0 -90 0">
+        <a-plane width="3" height="1" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="15 EGP" color="white" align="center" width="10" position="0 0 0"></a-text>
+      </a-entity>
+
+      <a-entity position="-33.19 7.0 128" rotation="0 90 0">
+        <a-plane width="3" height="1" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="25 EGP" color="white" align="center" width="10" position="0 0 0"></a-text>
+      </a-entity>
+
+      <a-entity position="-12.21 7.0 128" rotation="0 -90 0">
+        <a-plane width="3" height="1" color="#B8860B" material="side: double"></a-plane>
+        <a-text value="15 EGP" color="white" align="center" width="10" position="0 0 0"></a-text>
+      </a-entity>
+      
+    </a-scene>
+
+    <script>
+      
+    AFRAME.registerComponent('look-at-player', {
+      tick: function () {
+        const player = document.querySelector('#myCam');
+        if (player) {
+          const targetPos = player.object3D.getWorldPosition(new THREE.Vector3());
+          this.el.object3D.lookAt(targetPos);
+          this.el.object3D.rotation.y += Math.PI;
+          this.el.object3D.rotation.x = 0;
+          this.el.object3D.rotation.z = 0;
+        }
+      }
+    });
+
+    // Component للمسك المنتجات
+    AFRAME.registerComponent('grabable', {
+      init: function() {
+        this.el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!window.heldItem && this.el.parentNode.id !== 'right-hand' && !this.el.getAttribute('in-cart')) {
+            window.heldItem = this.el;
+            let rightHand = document.getElementById('right-hand');
+            let oldPos = this.el.getAttribute('position');
+            let oldRot = this.el.getAttribute('rotation');
+            let oldParent = this.el.parentNode;
+            
+            this.el.setAttribute('data-old-parent', oldParent.id);
+            this.el.setAttribute('data-old-pos', JSON.stringify(oldPos));
+            this.el.setAttribute('data-old-rotation', JSON.stringify(oldRot));
+            
+            rightHand.appendChild(this.el);
+            this.el.setAttribute('position', '0 0 -0.3');
+            this.el.setAttribute('rotation', '0 0 0');
+          }
+        });
+      }
+    });
+    
+    function fillShelf(modelId, startX, posY, startZ, countX, countZ, spX, spZ, rot, scl) {
+      const scene = document.querySelector('a-scene');
+      
+      for (let j = 0; j < countZ; j++) {
+        for (let i = 0; i < countX; i++) {
+          let item = document.createElement('a-entity');
+          item.setAttribute('gltf-model', modelId);
+          
+          let currentX = startX + (i * spX);
+          let currentZ = startZ + (j * spZ);
+          
+          item.setAttribute('position', `${currentX} ${posY} ${currentZ}`);
+          item.setAttribute('rotation', rot); 
+          item.setAttribute('scale', scl);
+          item.setAttribute('grabable', '');
+          item.setAttribute('class', 'product');
+          
+          let price = 10;
+          if (modelId === '#chips2-model') price = 15;
+          else if (modelId === '#chips3-model') price = 10;
+          else if (modelId === '#pepsi-model') price = 25;
+          item.setAttribute('data-price', price);
+          
+          scene.appendChild(item);
+        }
+      }
+    }
+
+    function placeFridges(modelId, startX, posY, startZ, count, spacingZ, rot, scl) {
+      const scene = document.querySelector('a-scene');
+      for (let i = 0; i < count; i++) {
+        let fridge = document.createElement('a-entity');
+        fridge.setAttribute('gltf-model', modelId);
+        let currentZ = startZ + (i * spacingZ);
+        fridge.setAttribute('position', `${startX} ${posY} ${currentZ}`);
+        fridge.setAttribute('rotation', rot);
+        fridge.setAttribute('scale', scl);
+        scene.appendChild(fridge);
+      }
+    }
+
+    function fillFridgeBottles(modelId, startX, startY, startZ, shelvesCount, bottlesPerShelf, spacingY, spacingZ, scl) {
+      const scene = document.querySelector('a-scene');
+      const fragment = document.createDocumentFragment();
+
+      for (let s = 0; s < shelvesCount; s++) {
+        let currentY = startY - (s * spacingY);
+
+        for (let i = 0; i < bottlesPerShelf; i++) {
+          let bottle = document.createElement('a-entity');
+          bottle.setAttribute('gltf-model', modelId);
+          
+          let currentZ = startZ + (i * spacingZ);
+          
+          bottle.setAttribute('position', {x: startX, y: currentY, z: currentZ});
+          bottle.setAttribute('scale', scl);
+          bottle.setAttribute('class', 'interactable drink product');
+          bottle.setAttribute('grabable', '');
+          bottle.setAttribute('data-price', '25');
+          bottle.setAttribute('shadow', 'cast: false');
+
+          fragment.appendChild(bottle);
+        }
+      }
+      scene.appendChild(fragment);
+    }
+
+    // دوال المساعدين - معلقة حالياً لتوفير الرام
+    // placeFridges('#coca-fridge', -9.70, 0, 61.90, 1, 4.0, '0 -90 0', '4 4 4');
+     //fillShelf('#chips2-model', -4.33, 4.25, 59.69, 1, 2, 1.2, -0.5, '0 0 0', '0.5 0.5 0.5');
+     //fillShelf('#chips2-model', -4.33, 2.63, 59.69, 1, 2, 1.2, -0.5, '0 00 0', '0.5 0.5 0.5');
+     //fillShelf('#chips3-model', 19.20, 4.30, 40.85, 2, 1, -0.5, 1, '0 -120 0', '.006 .006 .006');
+    // fillShelf('#chips3-model', 19.20, 2.63, 55.3, 2, 15, -0.5, 1, '0 -120 0', '.006 .006 .006');
+     //fillFridgeBottles('#pepsi-model', -10.80, 5.45, 60.50, 1, 1, 1.2, 0.26, '0.5 0.5 0.5');
+
+    const rig = document.querySelector('#rig');
+    const cam = document.querySelector('#myCam');
+    const moveSpeed = 1.5;
+    const verticalSpeed = 0.2;
+
+    function move(direction) {
+      let rotation = cam.getAttribute('rotation');
+      let angle = rotation.y * (Math.PI / 180);
+      let currentPos = rig.getAttribute('position');
+      if (direction === 'forward') {
+        currentPos.x -= Math.sin(angle) * moveSpeed;
+        currentPos.z -= Math.cos(angle) * moveSpeed;
+      } else if (direction === 'backward') {
+        currentPos.x += Math.sin(angle) * moveSpeed;
+        currentPos.z += Math.cos(angle) * moveSpeed;
+      } else if (direction === 'up') { 
+        currentPos.y += verticalSpeed; 
+      } else if (direction === 'down') { 
+        currentPos.y -= verticalSpeed; 
+      }
+      rig.setAttribute('position', currentPos);
+    }
+
+    const setupBtn = (id, dir) => {
+      const btn = document.getElementById(id);
+      if(btn) {
+        btn.addEventListener('touchstart', (e) => { 
+          e.preventDefault(); 
+          window[dir + 'Interval'] = setInterval(() => move(dir), 50); 
+        });
+        btn.addEventListener('touchend', () => clearInterval(window[dir + 'Interval']));
+        btn.addEventListener('mousedown', (e) => { 
+          e.preventDefault(); 
+          window[dir + 'Interval'] = setInterval(() => move(dir), 50); 
+        });
+        btn.addEventListener('mouseup', () => clearInterval(window[dir + 'Interval']));
+      }
+    };
+
+    setupBtn('move-forward', 'forward');
+    setupBtn('move-backward', 'backward');
+    setupBtn('move-up', 'up');
+    setupBtn('move-down', 'down');
+
+    document.getElementById('get-pos').addEventListener('click', function () {
+      var rP = rig.getAttribute('position');
+      var cP = cam.getAttribute('position');
+      alert(`الإحداثيات:\nX: ${(rP.x + cP.x).toFixed(2)} Y: ${(rP.y + cP.y).toFixed(2)} Z: ${(rP.z + cP.z).toFixed(2)}`);
+    });
+
+    // ========== نظام المنتجات والعربة المتطور ==========
+    window.heldItem = null;
+    window.attachedCart = null;
+    window.cartItems = []; // المنتجات اللي في السلة
+    
+    function updateInfoPanel() {
+      let total = 0;
+      window.cartItems.forEach(item => {
+        let price = parseFloat(item.getAttribute('data-price') || 10);
+        total += price;
+      });
+      document.getElementById('info-panel').innerHTML = `🛒 السلة: ${window.cartItems.length} منتج | 💰 الإجمالي: ${total} جنيه`;
+    }
+    
+    // إضافة منتج للسلة (يظهر جواها)
+    // إضافة منتج للسلة (يظهر جواها)
+function addProductToCart(product) {
+  if (!product || product.getAttribute('in-cart')) return;
+  
+  // تحديد السعر تلقائيًا من نوع المنتج
+  let modelId = product.getAttribute('gltf-model');
+  let price = 10;
+  if (modelId && modelId.includes('chips2')) price = 15;
+  else if (modelId && modelId.includes('chips3')) price = 10;
+  else if (modelId && modelId.includes('pepsi')) price = 25;
+  product.setAttribute('data-price', price);
+  
+  // تحديد موقع العربة (لو في عربة ممسوكة)
+  let cartPosition;
+  if (window.attachedCart) {
+    cartPosition = window.attachedCart.getAttribute('position');
+  } else {
+    let rigPos = rig.getAttribute('position');
+    cartPosition = { x: rigPos.x + 1.5, y: rigPos.y, z: rigPos.z + 1.5 };
+  }
+  
+  // حساب موقع عشوائي في السلة
+  let angle = Math.random() * Math.PI * 2;
+  let radius = 0.6;
+  let xOffset = Math.cos(angle) * radius;
+  let zOffset = Math.sin(angle) * radius;
+  
+  // تغيير موقع المنتج ليكون داخل السلة
+  product.setAttribute('position', {
+    x: cartPosition.x + xOffset,
+    y: cartPosition.y + 0.6,
+    z: cartPosition.z + zOffset
+  });
+  
+  product.setAttribute('rotation', `0 ${Math.random() * 360} 0`);
+  product.setAttribute('scale', '0.5 0.5 0.5');
+  product.setAttribute('in-cart', 'true');
+  product.setAttribute('visible', 'true');
+  
+  // إزالة أي علاقة أبوة سابقة
+  let scene = document.querySelector('a-scene');
+  if (product.parentNode !== scene) {
+    scene.appendChild(product);
+  }
+  
+  // إضافة المنتج لقائمة السلة
+  window.cartItems.push(product);
+  updateInfoPanel();
+  
+  console.log('تم إضافة المنتج للسلة، عدد المنتجات:', window.cartItems.length);
+}
+    
+    // إخراج كل المنتجات من السلة ووضعها قدام الكاشير
+    // إخراج المنتجات من السلة ووضعها قدام الكاشير
+function emptyCartToCashier(cashierPos) {
+  let products = [...window.cartItems];
+  let total = 0;
+  
+  products.forEach(product => {
+    let price = parseFloat(product.getAttribute('data-price') || 10);
+    total += price;
+    
+    // تحريك المنتج قدام الكاشير
+    let xOffset = (Math.random() - 0.5) * 1.2;
+    let zOffset = Math.random() * 0.8;
+    product.setAttribute('position', {
+      x: cashierPos.x + xOffset,
+      y: cashierPos.y + 0.2,
+      z: cashierPos.z + zOffset
+    });
+    product.setAttribute('visible', 'true');
+    product.removeAttribute('in-cart');
+  });
+  
+  window.cartItems = [];
+  updateInfoPanel();
+  
+  return total;
+}
+    
+    // رمي المنتج (إرجاعه لمكانه الأصلي)
+    document.getElementById('throw-btn').addEventListener('click', function () {
+      if (window.heldItem) {
+        let scene = document.querySelector('a-scene');
+        let oldParentId = window.heldItem.getAttribute('data-old-parent');
+        let oldParent = document.getElementById(oldParentId);
+        let oldPos = JSON.parse(window.heldItem.getAttribute('data-old-pos'));
+        let oldRot = JSON.parse(window.heldItem.getAttribute('data-old-rotation'));
+        
+        if (oldParent) {
+          oldParent.appendChild(window.heldItem);
+          window.heldItem.setAttribute('position', oldPos);
+          window.heldItem.setAttribute('rotation', oldRot);
+        } else {
+          scene.appendChild(window.heldItem);
+          window.heldItem.setAttribute('position', oldPos);
+          window.heldItem.setAttribute('rotation', oldRot);
+        }
+        window.heldItem.setAttribute('visible', 'true');
+        window.heldItem.removeAttribute('in-cart');
+        window.heldItem = null;
+      }
+    });
+    
+    // مسك العربة (تتجره قدامي من غير ما تختفي)
+    document.getElementById('grab-cart-btn').addEventListener('click', function() {
+      let rigPos = rig.getAttribute('position');
+      let cart1 = document.getElementById('cart1');
+      let cart2 = document.getElementById('cart2');
+      
+      let pos1 = cart1.getAttribute('position');
+      let pos2 = cart2.getAttribute('position');
+      
+      let dist1 = Math.hypot(rigPos.x - pos1.x, rigPos.z - pos1.z);
+      let dist2 = Math.hypot(rigPos.x - pos2.x, rigPos.z - pos2.z);
+      
+      let nearestCart = dist1 < dist2 ? cart1 : cart2;
+      
+      if (window.attachedCart === nearestCart) {
+        alert('أنت ممسك هذه العربة بالفعل');
+        return;
+      }
+      
+      if (window.attachedCart) {
+        alert('اترك العربة أولاً');
+        return;
+      }
+      
+      window.attachedCart = nearestCart;
+      alert('تم مسك العربة! حرك نفسها وهتجر وراك');
+    });
+    
+    // ترك العربة (تثبت مكانها)
+    document.getElementById('drop-cart-btn').addEventListener('click', function() {
+      if (window.attachedCart) {
+        window.attachedCart = null;
+        alert('تم ترك العربة');
+      } else {
+        alert('لا تمسك بأي عربة');
+      }
+    });
+    
+    // حط المنتج في السلة (يظهر جواها)
+    document.getElementById('add-to-cart-btn').addEventListener('click', function() {
+      if (window.heldItem) {
+        addProductToCart(window.heldItem);
+        window.heldItem = null;
+        alert('تم إضافة المنتج إلى السلة');
+      } else {
+        alert('لا تمسك بأي منتج');
+      }
+    });
+    
+    // الدفع عند الكاشير
+    document.getElementById('pay-btn').addEventListener('click', function() {
+      let cashier = document.getElementById('cashier');
+      let cashierPos = cashier.getAttribute('position');
+      let rigPos = rig.getAttribute('position');
+      let distance = Math.hypot(rigPos.x - cashierPos.x, rigPos.z - cashierPos.z);
+      
+      if (distance > 5) {
+        alert('اقترب من الكاشير أولاً (الموظف)');
+        return;
+      }
+      
+      if (window.cartItems.length === 0) {
+        alert('سلتك فارغة! اشترِ منتجات أولاً');
+        return;
+      }
+      
+      // تشغيل صوت space.mp3
+      let spaceAudio = new Audio('assets/sounds/space.mp3');
+      spaceAudio.play().catch(e => console.log('space.mp3 غير متوفر'));
+      
+      // إخراج المنتجات من السلة ووضعها قدام الكاشير
+      let total = emptyCartToCashier(cashierPos);
+      
+      setTimeout(() => {
+        let userMoney = prompt(`الإجمالي: ${total} جنيه\nكم تريد أن تدفع؟\n(الأسعار: chips2=15، chips3=10، bottle=25)`, total);
+        let payment = parseInt(userMoney);
+        
+        if (isNaN(payment)) {
+          alert('رجاء إدخال مبلغ صحيح');
+          return;
+        }
+        
+        if (payment < total) {
+          let lossAudio = new Audio('assets/sounds/loss.mp3');
+          lossAudio.play().catch(e => console.log('loss.mp3 غير متوفر'));
+          alert(`❌ المبلغ غير كافٍ! تحتاج ${total} جنيه ودفعت ${payment} جنيه فقط.\nالمنتجات رجعت لأماكنها (أعد المحاولة)`);
+        } else if (payment > total) {
+          let muchAudio = new Audio('assets/sounds/much.mp3');
+          muchAudio.play().catch(e => console.log('much.mp3 غير متوفر'));
+          let change = payment - total;
+          alert(`✅ شكراً لك! المبلغ المدفوع: ${payment} جنيه\n🔄 الباقي: ${change} جنيه\n🎉 استمتع بتسوقك!`);
+          
+          // تنظيف المنتجات من المشهد
+          document.querySelectorAll('.product').forEach(p => {
+            if (p.getAttribute('in-cart') !== 'true') p.parentNode.removeChild(p);
+          });
+        } else {
+          alert(`✅ شكراً لك! تم الدفع بنجاح بمبلغ ${total} جنيه`);
+          document.querySelectorAll('.product').forEach(p => {
+            if (p.getAttribute('in-cart') !== 'true') p.parentNode.removeChild(p);
+          });
+        }
+      }, 500);
+    });
+    
+    // تحديث موقع العربة مع الكاميرا (تتجر قدامي من غير ما تختفي)
+    function updateCartPosition() {
+      if (window.attachedCart) {
+        let rigPos = rig.getAttribute('position');
+        let camRot = cam.getAttribute('rotation');
+        let angle = camRot.y * (Math.PI / 180);
+        
+        // العربة تتجر قدام اللاعب بمسافة ثابتة
+        let offsetX = Math.sin(angle) * 1.8;
+        let offsetZ = Math.cos(angle) * 2.2;
+        
+        window.attachedCart.setAttribute('position', {
+          x: rigPos.x + offsetX,
+          y: 0.2,
+          z: rigPos.z + offsetZ
+        });
+      }
+      requestAnimationFrame(updateCartPosition);
+    }
+    updateCartPosition();
+    
+    </script>
+    <script src="script.js"></script>
+  </body>
+</html>
